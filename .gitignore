@@ -2,3 +2,4 @@ nbproject/private
 build/
 pylibshout.c
 pylibshout.so
+shout.h
