@@ -1,3 +1,5 @@
+import sys
+
 cdef extern from "sys/types.h":
     ctypedef unsigned int size_t
     ctypedef int ssize_t
@@ -24,11 +26,6 @@ cdef extern from "shout/shout.h":
     ssize_t shout_queuelen(shout_t *self)
     void shout_sync(shout_t *self)
     int shout_delay(shout_t *self)
-
-    int shout_set_metadata(shout_t *self, shout_metadata_t *metadata)
-    shout_metadata_t *shout_metadata_new()
-    void shout_metadata_free(shout_metadata_t *self)
-    int shout_metadata_add(shout_metadata_t *self, char *name, char *value)
 
     #properties:
     int shout_set_host(shout_t *self, char *host)
@@ -71,6 +68,11 @@ cdef extern from "shout/shout.h":
     unsigned int shout_get_public(shout_t *self)
 
     #takes a SHOUT_FORMAT_xxxx argument
+    int shout_set_metadata(shout_t *self, shout_metadata_t *metadata)
+    shout_metadata_t *shout_metadata_new()
+    void shout_metadata_free(shout_metadata_t *self)
+    int shout_metadata_add(shout_metadata_t *self, char *name, char *value)
+
     int shout_set_format(shout_t *self, unsigned int format)
     unsigned int shout_get_format(shout_t *self)
 
@@ -83,6 +85,33 @@ cdef extern from "shout/shout.h":
     int shout_set_nonblocking(shout_t* self, unsigned int nonblocking)
     unsigned int shout_get_nonblocking(shout_t *self)
 
+
+SHOUTERR_SUCCES = 1
+SHOUTERR_INSANE = -1
+SHOUTERR_NOCONNECT = -2
+SHOUTERR_NOLOGIN = -3
+SHOUTERR_SOCKET = -4
+SHOUTERR_MALLOC = -5
+SHOUTERR_METADATA = -6
+SHOUTERR_CONNECTED = -7
+SHOUTERR_UNCONNECTED = -8
+SHOUTERR_UNSUPPORTED = -9
+SHOUTERR_BUSY = -10
+
+SHOUT_FORMAT_OGG = 0
+SHOUT_FORMAT_MP3 = 1
+#backward-compatibility alias
+SHOUT_FORMAT_VORBIS	= SHOUT_FORMAT_OGG
+
+SHOUT_PROTOCOL_HTTP = 0
+SHOUT_PROTOCOL_XAUDIOCAST = 1
+SHOUT_PROTOCOL_ICY = 2
+
+SHOUT_AI_BITRATE =  'bitrate'
+SHOUT_AI_SAMPLERATE = 'samplerate'
+SHOUT_AI_CHANNELS = 'channels'
+SHOUT_AI_QUALITY = 'quality'
+
 def version():
     cdef int *major
     cdef int *minor
@@ -91,10 +120,14 @@ def version():
 
 cdef class Shout:
     cdef shout_t *shout_t
+    cdef shout_metadata_t *shout_metadata_t
+    __audio_info = {}
+    __metadata = {}
 
     def __init__(self):
         shout_init()
         self.shout_t = shout_new()
+        self.shout_metadata_t = shout_metadata_new()
 
     def open(self):
         i = shout_open(self.shout_t)
@@ -128,9 +161,6 @@ cdef class Shout:
         i = shout_close(self.shout_t)
         if i != 0:
             raise Exception(self.get_errno(), self.get_error())
-
-    def set_metadata(self, metadata):
-        pass
 
     def get_error(self):
         return shout_get_error(self.shout_t)
@@ -277,18 +307,46 @@ cdef class Shout:
             if i != 0:
                 raise Exception(i, 'Dumpfile is not correct')
 
-#    property audio_info:
-#        "A doc string can go here."
-#
-#        def __get__(self):
-#            return shout_get_audio_info(self.shout_t)
-#
-#        def __set__(self, audio_info):
-#            audio_info = str(audio_info)
-#            i = shout_set_audio_info(self.shout_t, audio_info)
-#            if i != 0:
-#                raise Exception(i, 'Audio info is not correct')
+    property audio_info:
+        "A doc string can go here."
 
+        def __get__(self):
+            return self.__audio_info
+
+        def __set__(self, dict):
+            #get the current module
+            pylibshout = globals()['pylibshout']
+
+            for key, value in dict.items():
+                const = 'SHOUT_AI_%s' % key.upper()
+                if hasattr(pylibshout, const):
+                    value = str(value)
+                    i = shout_set_audio_info(self.shout_t, key, value)
+                    self.__audio_info[key] = value
+                else:
+                    raise Exception('%s is not a valid audio_info attribute' % key)
+
+            if i != 0:
+                raise Exception(i, 'Audio info is not correct')
+
+    property metadata:
+        "A doc string can go here."
+
+        def __get__(self):
+            return self.__metadata
+
+        def __set__(self, dict):
+            for key, value in dict.items():
+                value = str(value)
+                shout_metadata_add(self.shout_metadata_t, key, value)
+                self.__metadata[key] = value
+
+            i = shout_set_metadata(self.shout_t, self.shout_metadata_t)
+
+            i = 0
+            if i != 0:
+                raise Exception(i, 'Metadata is not correct')
+   
     property public:
         "A doc string can go here."
 

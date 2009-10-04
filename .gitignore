@@ -3,3 +3,4 @@ build/
 pylibshout.c
 pylibshout.so
 shout.h
+.swp
