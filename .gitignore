@@ -4,3 +4,4 @@ pylibshout.c
 pylibshout.so
 shout.h
 .swp
+test/my_example.py
