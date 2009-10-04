@@ -67,7 +67,6 @@ cdef extern from "shout/shout.h":
     int shout_set_public(shout_t *self, unsigned int make_public)
     unsigned int shout_get_public(shout_t *self)
 
-    #takes a SHOUT_FORMAT_xxxx argument
     int shout_set_metadata(shout_t *self, shout_metadata_t *metadata)
     shout_metadata_t *shout_metadata_new()
     void shout_metadata_free(shout_metadata_t *self)
@@ -76,16 +75,13 @@ cdef extern from "shout/shout.h":
     int shout_set_format(shout_t *self, unsigned int format)
     unsigned int shout_get_format(shout_t *self)
 
-    #takes a SHOUT_PROTOCOL_xxxxx argument
     int shout_set_protocol(shout_t *self, unsigned int protocol)
     unsigned int shout_get_protocol(shout_t *self)
 
-    #Instructs libshout to use nonblocking I/O. Must be called before
-    #* shout_open (no switching back and forth midstream at the moment).
     int shout_set_nonblocking(shout_t* self, unsigned int nonblocking)
     unsigned int shout_get_nonblocking(shout_t *self)
 
-
+#Some constants
 SHOUTERR_SUCCES = 1
 SHOUTERR_INSANE = -1
 SHOUTERR_NOCONNECT = -2
@@ -113,23 +109,31 @@ SHOUT_AI_CHANNELS = 'channels'
 SHOUT_AI_QUALITY = 'quality'
 
 def version():
+    """returns a static version string.  Non-null parameters will be set 
+    to theAttributeError: 'PropertyScope' object has no attribute 
+    'namespace_cname'"""
     cdef int *major
     cdef int *minor
     cdef int *patch
     return shout_version(major, minor, patch)
 
 cdef class Shout:
+    """Allocates and sets up a new shout_t.  Returns NULL if it can't get 
+    enough * memory.  The returns shout_t must be disposed of 
+    with shout_free."""
     cdef shout_t *shout_t
     cdef shout_metadata_t *shout_metadata_t
     __audio_info = {}
     __metadata = {}
 
     def __init__(self):
+        """initializes the shout library. Must be called before anything else"""
         shout_init()
         self.shout_t = shout_new()
         self.shout_metadata_t = shout_metadata_new()
 
     def open(self):
+        """shout_open (no switching back and forth midstream at the moment)."""
         i = shout_open(self.shout_t)
         if i != 0:
             raise Exception(self.get_errno(), self.get_error())
@@ -140,19 +144,27 @@ cdef class Shout:
             raise Exception(self.get_errno(), self.get_error())
 
     def send_raw(self, data):
+        """Send unparsed data to the server.  Do not use this unless you 
+        know what you are doing. 
+        Returns the number of bytes written, or < 0 on error."""
         i = shout_send_raw(self.shout_t, data, len(data))
         if i != 0:
             raise Exception(self.get_errno(), self.get_error())
 
     def queuelen(self):
+        """return the number of bytes currently on the write queue (only 
+        makes sense in nonblocking mode)"""
         i = shout_queuelen(self.shout_t)
         if i != 0:
             raise Exception(self.get_errno(), self.get_error())
 
     def sync(self):
+        """Puts caller to sleep until it is time to send more data to the
+        server"""
         shout_sync(self.shout_t)
 
     def delay(self):
+        """Amount of time in ms caller should wait before sending again"""
         i = shout_delay(self.shout_t)
         if i != 0:
             raise Exception(self.get_errno(), self.get_error())
@@ -163,14 +175,27 @@ cdef class Shout:
             raise Exception(self.get_errno(), self.get_error())
 
     def get_error(self):
+        """Returns a statically allocated string describing the last shout error
+         * to occur.  Only valid until the next libshout call on this 
+        shout_t"""
         return shout_get_error(self.shout_t)
 
     def get_errno(self):
+        """Return the error code (e.g. SHOUTERR_SOCKET) for this shout 
+        instance"""
         return shout_get_errno(self.shout_t)
+
+    def connected(self):
+        """returns SHOUTERR_CONNECTED or SHOUTERR_UNCONNECTED"""
+        return shout_get_connected(self.shout_t)
 
     def __del(self):
         self.close()
+        shout_shutdown()
 
+    """Parameter manipulation functions.  libshout makes copies of all 
+    parameters, the caller may free its copies after giving them to 
+    libshout. May return * SHOUTERR_MALLOC */"""
     property host:
         "A doc string can go here."
 
@@ -330,7 +355,13 @@ cdef class Shout:
                 raise Exception(i, 'Audio info is not correct')
 
     property metadata:
-        "A doc string can go here."
+        """Sets MP3 metadata. Only key is now 'song' :S 
+        Returns:
+            SHOUTERR_SUCCESS
+            SHOUTERR_UNSUPPORTED if format isn't MP3
+            SHOUTERR_MALLOC
+            SHOUTERR_INSANE
+            SHOUTERR_NOCONNECT"""
 
         def __get__(self):
             return self.__metadata
@@ -372,7 +403,7 @@ cdef class Shout:
                 raise Exception(i, 'Format is not correct')
 
     property protocol:
-        "A doc string can go here."
+        """takes a SHOUT_PROTOCOL_xxxxx argument"""
 
         def __get__(self):
             return shout_get_protocol(self.shout_t)
