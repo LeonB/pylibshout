@@ -1,6 +1,6 @@
 """Python libshout2 interface
 
-Based on the c-libary libshout 2 and build with Cython
+Based on the c-libary libshout 2 and built with Cython
 """
 
 classifiers = """\
