@@ -34,5 +34,5 @@ setup(
     long_description = "\n".join(doclines[2:]),
     #py_modules = ['pylibshout'],
     ext_modules = ext_modules,
-    install_requires = ['Cython']
+    requires = ['Cython']
 )
