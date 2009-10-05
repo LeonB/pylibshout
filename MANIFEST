@@ -1,0 +1,7 @@
+README.txt
+setup.py
+build.py
+pylibshout.pyx
+pylibshout.c
+test/example.py
+doc/shout.h
